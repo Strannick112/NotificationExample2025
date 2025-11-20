@@ -8,6 +8,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,97 +31,62 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import com.example.myapplication.notifactions.ChargeNotification
+import com.example.myapplication.notifactions.ISP_406
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 
 class MainActivity : ComponentActivity() {
+    lateinit var chargeBroadcastReceiver: ChargeBroadcastReceiver
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 //        enableEdgeToEdge()
-
-        val notificationChannelGroup = NotificationChannelGroup("russian", "Россия")
-
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        notificationManager.createNotificationChannelGroup(notificationChannelGroup)
-// Создать NotificationChannel (только для Android 8.0+)
-        val channelId = "my_channel_id"
-        val channelName = "Первый"
-        val importance = NotificationManager.IMPORTANCE_HIGH
-        val channel = NotificationChannel(
-            channelId, channelName, importance
-        ).apply {
-            description = "Самый самый чудесный первый канал, российский"
-            group = "russian"
-        }
-        notificationManager.createNotificationChannel(channel)
-
+        ISP_406(notificationManager)
+        chargeBroadcastReceiver = ChargeBroadcastReceiver()
         setContent {
+            val chargeNotification = ChargeNotification(
+                LocalContext.current, notificationManager
+            )
             MyApplicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        chargeNotification
                     )
                 }
             }
         }
     }
-}
 
-fun makeNotification(context: Context){
-    // Создать уведомление
-    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    val channelId = "my_channel_id"
-//    val notificationId = 1
-    val pendingIntent = PendingIntent.getActivity(
-        context, 0,
-        Intent(context, MainActivity::class.java),
-        PendingIntent.FLAG_MUTABLE)
-
-    // Создаем действие с RemoteInput
-    val replyAction = NotificationCompat.Action.Builder(
-        R.drawable.ic_launcher_foreground,
-        "Ответить",
-        pendingIntent
-    ).addRemoteInput(
-        RemoteInput.Builder("key_text_reply")
-            .setLabel("Посчитать")
-            .build()
-    ).build()
-
-    val builder = NotificationCompat.Builder(context, channelId)
-        .setSmallIcon(R.drawable.ic_launcher_foreground)
-        .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.ic_launcher_foreground)) // Установите свой значок
-//        .setContentIntent(pendingIntent)
-        .addAction(
-            R.drawable.ic_launcher_foreground,
-            "1",
-            pendingIntent
+    override fun onResume() {
+        super.onResume()
+        registerReceiver(
+            chargeBroadcastReceiver,
+            IntentFilter(Intent.ACTION_POWER_CONNECTED)
+                .apply { addAction(Intent.ACTION_POWER_DISCONNECTED) }
         )
-        .addAction(
-            R.drawable.ic_launcher_foreground,
-            "Н2",
-            pendingIntent
-        )
-        .addAction(replyAction)
-        .setContentTitle("Заголовок уведомления")
-        .setContentText("Текст уведомления")
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
-        .build()
+    }
 
-    // Показать уведомление
-    notificationManager.notify(System.currentTimeMillis().toInt(), builder)
+    override fun onPause() {
+        super.onPause()
+//        unregisterReceiver(
+//            chargeBroadcastReceiver
+//        )
+    }
 }
 
 @Composable
-fun Greeting( modifier: Modifier = Modifier) {
-    val context = LocalContext.current
+fun Greeting(
+    modifier: Modifier = Modifier,
+    chargeNotification: ChargeNotification
+) {
     Column(){
-        Button(onClick = {makeNotification(context)}){
+        Button(onClick = {
+            chargeNotification.makeNotification("Зарядка подключена")}){
             Text("Click me...")
         }
     }
-
 }
 
 //@Preview(showBackground = true)
